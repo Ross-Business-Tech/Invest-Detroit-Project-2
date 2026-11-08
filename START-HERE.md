@@ -2,6 +2,17 @@
 
 You describe what you want in plain English. Claude builds it, checks it in a browser, and gives you a link you can open on your phone. When your team is happy with a change, it goes to your team's private **dev site**. At the end of the event, staff reveal every team's app at its public address.
 
+## Our app: the Invest Detroit Underwriting Assistant
+
+We are building a tool for Invest Detroit's credit team that turns a borrower's documents into a draft Investment Summary in minutes
+instead of about 17 days. The numbers are always calculated by code and checked against Invest Detroit's Credit Guidelines; a person
+reviews every draft. See `README.md` for what is built, how well it is tested, and what is still open.
+
+- **The website** (the `src/` folder) shows pre-computed examples for twelve fictional companies. It can only host static pages.
+- **The full tool** (the `underwriter-tool/` folder) is written in Python. It is in the repository for reference and for the
+  team's presentations; ask Claude to explain or change it, and to re-run `python scripts/export_demo.py` after any change.
+- **Dates:** client meeting Nov 10, final presentation Nov 17.
+
 **You will need:**
 - a GitHub account, invited to your team's repository by your instructor;
 - the **Claude account provided for this event** (look for the invitation email from Claude). Use it instead of any personal Claude account: your team's setup only exists there.
