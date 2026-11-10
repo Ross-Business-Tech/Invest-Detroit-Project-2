@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import Kpis from './components/Kpis.jsx'
 import Memo from './components/Memo.jsx'
 import Analyze from './components/Analyze.jsx'
+import Outputs from './components/Outputs.jsx'
 import { Flags, Guidelines } from './components/Panels.jsx'
-import { getLiveDeal, liveEnabled, wordUrl } from './api.js'
+import { getLiveDeal, wordUrl } from './api.js'
 import { dscrTone, money, parseRoute, times } from './lib.js'
 import './App.css'
 
@@ -54,6 +55,7 @@ function useLiveDeal(id, skip) {
 
 function Home() {
   const { data, error } = useDemoFile('index')
+  const [version, setVersion] = useState(0)
   return (
     <>
       <section className="hero">
@@ -69,10 +71,15 @@ function Home() {
           <li>The tool drafts; people decide.</li>
         </ul>
         <p className="muted small">
-          Below are twelve <strong>fictional</strong> companies, from a restaurant to a big tech firm and a new apartment building.
-          Open one to see the draft the tool wrote.
+          Add documents in step 1 and the analysis files appear in step 2. Or open one of the twelve <strong>fictional</strong>{' '}
+          example companies below to see what the tool writes.
         </p>
       </section>
+      <div className="workspace">
+        <Analyze onSaved={() => setVersion((v) => v + 1)} />
+        <Outputs examples={data} version={version} />
+      </div>
+      <h2 className="section-title">Example companies</h2>
       {error && <div className="banner bad">{error}</div>}
       {!data && !error && <div className="loading">Loading examples…</div>}
       {data && (
@@ -183,7 +190,7 @@ export default function App() {
           <span>Invest Detroit <span className="brand-sub">Underwriting Assistant</span></span>
         </a>
         <nav>
-          {liveEnabled && <a href="#/analyze">Analyze a deal</a>}
+          <a href="#/">Workspace</a>
           <a href="#/about">How it works</a>
         </nav>
       </header>
@@ -191,8 +198,6 @@ export default function App() {
       <main>
         {route.page === 'deal' ? (
           <Deal id={route.id} tab={route.tab} live={route.live} key={route.id} />
-        ) : route.page === 'analyze' ? (
-          <Analyze />
         ) : route.page === 'about' ? (
           <About />
         ) : (
