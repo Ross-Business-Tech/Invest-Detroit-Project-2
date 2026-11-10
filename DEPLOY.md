@@ -1,25 +1,30 @@
-# Putting the app online: Render (backend) + Vercel (website)
+# Putting the app online: everything on Render
 
-Do the steps in this order, because the website needs the backend's address.
+Render hosts two things from this repository, both described in `render.yaml`:
+the **backend** (Python, reads the documents) and the **website** (the pages people see).
+The website needs the backend's address, so you fill it in after the first deploy.
 
-## 1. Backend on Render (free)
-1. In Render: **New > Blueprint**, pick this GitHub repository and the branch you want to deploy. Render reads `render.yaml`.
+## 1. Create both on Render
+1. In Render: **New > Blueprint**, pick this GitHub repository and the branch `main`.
 2. When asked for values, enter:
-   - `ANTHROPIC_API_KEY`: your Anthropic key. Type it only into Render's page. Never put it in GitHub or in chat.
-   - `ALLOWED_ORIGINS`: leave empty for now (you will fill it in at step 3).
-3. Wait for the first deploy. Render shows the service address, like `https://invest-detroit-underwriter-api.onrender.com`.
-4. Open `<that address>/api/status` in a browser. You should see `"llm_available": true`.
+   - `ANTHROPIC_API_KEY` (backend): your Anthropic key. Type it only into Render's page. Never put it in GitHub or in chat.
+   - `ALLOWED_ORIGINS` (backend): leave empty for now.
+   - `VITE_API_BASE` (website): leave empty for now.
+3. Click **Apply**. Render builds both. The backend finishes first.
+4. Copy the backend's address (service `invest-detroit-underwriter-api`), like `https://invest-detroit-underwriter-api.onrender.com`.
+   Open it with `/api/status` on the end. You should see `"llm_available": true`.
 
-## 2. Website on Vercel
-1. In Vercel: **Add New > Project**, import this repository, same branch. Vercel reads `vercel.json`; keep the defaults.
-2. Under **Environment Variables** add `VITE_API_BASE` = the Render address from step 1.3 (no slash at the end).
-3. Deploy. Vercel shows the website address, like `https://your-app.vercel.app`.
+## 2. Point the website at the backend
+1. Open the **website** service (`invest-detroit-underwriter`) > **Environment**.
+2. Set `VITE_API_BASE` to the backend address from 1.4, with no slash at the end. Save.
+3. Choose **Manual Deploy > Deploy latest commit** so the website is rebuilt with it.
+4. Copy the website's address, like `https://invest-detroit-underwriter.onrender.com`.
 
 ## 3. Lock the backend to your website
-In Render, open the service > **Environment**, set `ALLOWED_ORIGINS` to the Vercel address from step 2.3 and save.
+Open the backend service > **Environment**, set `ALLOWED_ORIGINS` to the website address from 2.4, and save.
 
 ## Good to know
-- Render's free plan sleeps after 15 idle minutes. The first visit afterwards takes about a minute; the Analyze page says so.
-- Uploaded files and drafts live on a temporary disk. They vanish when the server restarts or after 24 hours.
+- The free backend sleeps after 15 idle minutes. The first visit afterwards takes about a minute; the Analyze page says so. The website itself is static and always opens fast.
+- Uploaded files and drafts live on a temporary disk. They vanish when the backend restarts or after 24 hours.
 - This is a demo: use fictional documents only.
-- If you change `VITE_API_BASE`, redeploy the Vercel project so the change takes effect.
+- Any change to `VITE_API_BASE` needs a redeploy of the website.

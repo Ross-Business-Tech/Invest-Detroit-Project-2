@@ -1,4 +1,4 @@
-# Render blueprint for the Python backend (the website itself is hosted on Vercel).
+# Render blueprint: the Python backend (web service) and the website (static site), both on Render.
 services:
   - type: web
     name: invest-detroit-underwriter-api
@@ -14,8 +14,20 @@ services:
       - key: ANTHROPIC_API_KEY
         sync: false # you type this into Render's dashboard; it is never stored in git
       - key: ALLOWED_ORIGINS
-        sync: false # the Vercel address, e.g. https://your-app.vercel.app (leave empty to allow any site)
+        sync: false # the website's Render address, e.g. https://invest-detroit-underwriter.onrender.com (leave empty to allow any site)
       - key: UNDERWRITER_DATA_DIR
         value: /tmp/underwriter
       - key: UNDERWRITER_RETENTION_HOURS
         value: "24"
+
+  - type: web
+    name: invest-detroit-underwriter
+    runtime: static
+    rootDir: .
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: VITE_API_BASE
+        sync: false # the backend's Render address, e.g. https://invest-detroit-underwriter-api.onrender.com (no slash at the end)
