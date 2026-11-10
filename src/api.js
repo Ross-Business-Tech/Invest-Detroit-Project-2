@@ -28,6 +28,8 @@ export const getLiveDeal = (id) => request(`/api/deals/${encodeURIComponent(id)}
 export const getJob = (id) => request(`/api/jobs/${encodeURIComponent(id)}`)
 export const wordUrl = (id) => `${API}/api/deals/${encodeURIComponent(id)}/export.docx`
 
+export const jsonUrl = (id) => `${API}/api/deals/${encodeURIComponent(id)}/export.json`
+
 export function uploadPdfs(files) {
   const body = new FormData()
   for (const f of files) body.append('files', f)
