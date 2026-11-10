@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import Kpis from './components/Kpis.jsx'
 import Memo from './components/Memo.jsx'
+import Analyze from './components/Analyze.jsx'
 import { Flags, Guidelines } from './components/Panels.jsx'
+import { getLiveDeal, liveEnabled, wordUrl } from './api.js'
 import { dscrTone, money, parseRoute, times } from './lib.js'
 import './App.css'
 
@@ -31,6 +33,22 @@ function useDemoFile(name) {
       live = false
     }
   }, [name])
+  return state
+}
+
+// Loads a result the backend just produced from uploaded documents.
+function useLiveDeal(id, skip) {
+  const [state, setState] = useState({ data: null, error: null })
+  useEffect(() => {
+    if (skip) return undefined
+    let live = true
+    getLiveDeal(id)
+      .then((data) => live && setState({ data, error: null }))
+      .catch((e) => live && setState({ data: null, error: e.message }))
+    return () => {
+      live = false
+    }
+  }, [id, skip])
   return state
 }
 
@@ -88,8 +106,11 @@ const TABS = [
   ['flags', 'To check'],
 ]
 
-function Deal({ id, tab }) {
-  const { data: deal, error } = useDemoFile(id)
+function Deal({ id, tab, live }) {
+  const demo = useDemoFile(live ? 'index' : id)
+  const liveState = useLiveDeal(id, !live)
+  const { data: deal, error } = live ? liveState : demo
+  const base = live ? `#/live/${id}` : `#/deal/${id}`
   if (error) return <div className="banner bad">{error} <a href="#/">Back to examples</a></div>
   if (!deal) return <div className="loading">Loading…</div>
   const warnings = deal.flags.filter((f) => f.severity !== 'info').length
@@ -100,14 +121,14 @@ function Deal({ id, tab }) {
         <div>
           <h1>{deal.memo.sections[0].blocks[0].left[0]}</h1>
           <span className={'tag ' + (deal.deal_type === 'cre' ? 'cre' : 'sb')}>{deal.deal_type === 'cre' ? 'Real estate' : 'Small business'}</span>{' '}
-          <span className="muted small">{deal.label} · fictional company</span>
+          <span className="muted small">{live ? 'Drafted from your uploaded documents' : `${deal.label} · fictional company`}</span>
         </div>
-        <a className="btn primary" href={`/demo/${id}.docx`} download>Download Word draft</a>
+        <a className="btn primary" href={live ? wordUrl(id) : `/demo/${id}.docx`} download>Download Word draft</a>
       </div>
       <Kpis deal={deal} />
       <div className="tabs" role="tablist">
         {TABS.map(([k, label]) => (
-          <a key={k} role="tab" aria-selected={tab === k} className={'tab' + (tab === k ? ' active' : '')} href={`#/deal/${id}/${k}`}>
+          <a key={k} role="tab" aria-selected={tab === k} className={'tab' + (tab === k ? ' active' : '')} href={`${base}/${k}`}>
             {label}
             {k === 'flags' && <span className="count">{warnings}</span>}
           </a>
@@ -162,12 +183,21 @@ export default function App() {
           <span>Invest Detroit <span className="brand-sub">Underwriting Assistant</span></span>
         </a>
         <nav>
+          {liveEnabled && <a href="#/analyze">Analyze a deal</a>}
           <a href="#/about">How it works</a>
         </nav>
       </header>
       <div className="demo-banner">Demo with fictional companies. No real borrower data.</div>
       <main>
-        {route.page === 'deal' ? <Deal id={route.id} tab={route.tab} key={route.id} /> : route.page === 'about' ? <About /> : <Home />}
+        {route.page === 'deal' ? (
+          <Deal id={route.id} tab={route.tab} live={route.live} key={route.id} />
+        ) : route.page === 'analyze' ? (
+          <Analyze />
+        ) : route.page === 'about' ? (
+          <About />
+        ) : (
+          <Home />
+        )}
       </main>
       <footer>Business+Tech AI Sprint · Draft output for underwriter review, not a lending decision</footer>
     </>

@@ -100,3 +100,13 @@ table.grid tr.flag td, tr.critical td { background: #fde8e7; } tr.warning td { b
   .btn.primary { width: 100%; text-align: center; }
   .flagrow { grid-template-columns: 1fr; gap: 2px; }
 }
+
+/* Analyze a deal */
+.topbar nav { display: flex; gap: 16px; }
+.banner.warn { background: #fff6e0; color: #6d4700; }
+.filepick { display: block; margin: 16px 0 8px; font-size: 14px; }
+.filepick span { display: block; font-weight: 600; margin-bottom: 6px; }
+.filepick input { width: 100%; font-size: 14px; }
+.filelist { margin: 8px 0 16px; padding-left: 20px; font-size: 14px; }
+.progress { margin: 16px 0 0; padding-left: 20px; font-size: 14px; color: var(--muted); }
+.progress li:last-child { color: var(--ink); font-weight: 600; }

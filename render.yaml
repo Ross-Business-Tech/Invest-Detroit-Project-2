@@ -1,0 +1,21 @@
+# Render blueprint for the Python backend (the website itself is hosted on Vercel).
+services:
+  - type: web
+    name: invest-detroit-underwriter-api
+    runtime: python
+    plan: free
+    rootDir: underwriter-tool
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn underwriter.app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/status
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: ANTHROPIC_API_KEY
+        sync: false # you type this into Render's dashboard; it is never stored in git
+      - key: ALLOWED_ORIGINS
+        sync: false # the Vercel address, e.g. https://your-app.vercel.app (leave empty to allow any site)
+      - key: UNDERWRITER_DATA_DIR
+        value: /tmp/underwriter
+      - key: UNDERWRITER_RETENTION_HOURS
+        value: "24"

@@ -23,6 +23,7 @@ from .env import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -44,6 +45,13 @@ for d in (DEALS, UPLOADS):
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("underwriter")
 app = FastAPI(title="Invest Detroit AI Underwriting Assistant")
+
+# The website (on Vercel) is a different address from this server, so the browser needs permission to call it.
+# ALLOWED_ORIGINS is a comma-separated list such as "https://my-app.vercel.app"; the default "*" allows any site.
+_origins = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "*").split(",") if o.strip()]
+app.add_middleware(CORSMiddleware, allow_origins=_origins, allow_methods=["*"], allow_headers=["*"],
+                   expose_headers=["Content-Disposition"])
+MAX_UPLOAD_MB = float(os.environ.get("MAX_UPLOAD_MB", "20"))
 JOBS: dict[str, dict] = {}
 SAFE = re.compile(r"^[A-Za-z0-9_.\-]+$")
 
@@ -126,6 +134,9 @@ async def upload(files: list[UploadFile] = File(...)):
         if not name.lower().endswith(".pdf"):
             raise HTTPException(400, f"{name}: only PDF files are accepted")
         data = await f.read()
+        if len(data) > MAX_UPLOAD_MB * 1024 * 1024:
+            shutil.rmtree(folder, ignore_errors=True)
+            raise HTTPException(413, f"{name} is larger than {MAX_UPLOAD_MB:g} MB")
         (folder / name).write_bytes(data)
         payload.append((name, data))
     job = {"id": deal_id, "status": "running", "progress": ["Upload received"], "error": None}
@@ -165,6 +176,19 @@ def get_deal(deal_id: str):
         log.exception("analysis failed")
         return JSONResponse({"deal": json.loads(deal.model_dump_json()), "result": None, "error": str(e)})
     return {"deal": json.loads(deal.model_dump_json()), "result": res}
+
+
+@app.get("/api/deals/{deal_id}/view")
+def deal_view(deal_id: str):
+    """The same compact shape as the pre-computed website examples, so the website can draw a live result."""
+    deal = load_deal(deal_id)
+    res = analyze(deal)
+    return jsonable({"id": deal.id, "label": "Uploaded documents", "blurb": "", "deal_type": res["deal_type"],
+                     "summary": res["summary"], "naics": res["naics"], "memo": res["memo"],
+                     "exceptions": [{k: e[k] for k in ("kind", "item", "requirement", "actual", "counts_toward_oversight")}
+                                    for e in res["policy"]["exceptions"]],
+                     "oversight": res["policy"]["oversight_council_required"],
+                     "flags": [f.to_dict() for f in res["flags"]]})
 
 
 @app.put("/api/deals/{deal_id}")
