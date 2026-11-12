@@ -1,6 +1,9 @@
 // Where the Python backend lives. On Vercel this comes from the VITE_API_BASE setting (the Render address, no
 // trailing slash). When it is empty the live features are switched off and only the pre-computed examples show.
-export const API = (import.meta.env.VITE_API_BASE || '').replace(/\/+$/, '')
+// If the setting is empty, the live site falls back to the backend address named in render.yaml, so uploads work
+// without any extra setup. Local development and tests still start with live features off.
+const DEFAULT_BACKEND = 'https://invest-detroit-underwriter-api.onrender.com'
+export const API = (import.meta.env.VITE_API_BASE || (import.meta.env.PROD ? DEFAULT_BACKEND : '')).replace(/\/+$/, '')
 export const liveEnabled = API !== ''
 
 async function request(path, opts) {
