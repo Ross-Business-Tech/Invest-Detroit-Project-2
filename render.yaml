@@ -11,7 +11,7 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.8
-      - key: ANTHROPIC_API_KEY
+      - key: API_Invest_Detroit
         sync: false # you type this into Render's dashboard; it is never stored in git
       - key: ALLOWED_ORIGINS
         sync: false # the website's Render address, e.g. https://invest-detroit-underwriter.onrender.com (leave empty to allow any site)
