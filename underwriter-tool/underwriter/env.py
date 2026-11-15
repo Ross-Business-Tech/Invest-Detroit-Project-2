@@ -4,9 +4,13 @@ from pathlib import Path
 
 
 def use_key_alias() -> None:
-    """The team saved the Claude key under the name API_Invest_Detroit; the Anthropic library expects ANTHROPIC_API_KEY."""
-    if os.environ.get("API_Invest_Detroit") and not os.environ.get("ANTHROPIC_API_KEY"):
-        os.environ["ANTHROPIC_API_KEY"] = os.environ["API_Invest_Detroit"]
+    """The team saved the Claude key under its own name; the Anthropic library expects ANTHROPIC_API_KEY."""
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return
+    for name in ("API_INVESTD", "API_Invest_Detroit"):
+        if os.environ.get(name):
+            os.environ["ANTHROPIC_API_KEY"] = os.environ[name]
+            return
 
 
 def load_dotenv(path: Path | None = None) -> None:

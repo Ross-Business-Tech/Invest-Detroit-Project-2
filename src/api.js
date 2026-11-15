@@ -2,7 +2,7 @@
 // trailing slash). When it is empty the live features are switched off and only the pre-computed examples show.
 // If the setting is empty, the live site falls back to the backend address named in render.yaml, so uploads work
 // without any extra setup. Local development and tests still start with live features off.
-const DEFAULT_BACKEND = 'https://invest-detroit-project-2.onrender.com'
+const DEFAULT_BACKEND = 'https://invest-detroit-project-2-web.onrender.com'
 export const API = (import.meta.env.VITE_API_BASE || (import.meta.env.PROD ? DEFAULT_BACKEND : '')).replace(/\/+$/, '')
 export const liveEnabled = API !== ''
 
