@@ -124,7 +124,7 @@ def load_fixture(name: str):
 @app.post("/api/deals/upload")
 async def upload(files: list[UploadFile] = File(...)):
     if not api_available():
-        raise HTTPException(400, "No ANTHROPIC_API_KEY configured on the server. Add it to .env, or load a sample deal.")
+        raise HTTPException(400, "No API key is configured on the server. Add it in Render (or .env), or load a sample deal.")
     deal_id = f"deal-{uuid.uuid4().hex[:8]}"
     folder = UPLOADS / deal_id
     folder.mkdir(parents=True)

@@ -127,3 +127,43 @@ def test_run_extraction_orchestration_with_fake_claude(sb_deal):
     assert any("PLACEHOLDERS" in l for l in deal.extraction_log)
     out = analyze(deal)
     assert out["summary"]["revenue"] == 2_200_000
+
+
+class FakeOpenAI:
+    """Stands in for the UM GPT Toolkit: returns canned JSON and records requests."""
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.requests = []
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create))
+
+    def _create(self, **kw):
+        self.requests.append(kw)
+        msg = SimpleNamespace(content=self.responses.pop(0))
+        return SimpleNamespace(choices=[SimpleNamespace(message=msg, finish_reason="stop")],
+                               usage=SimpleNamespace(prompt_tokens=10, completion_tokens=5))
+
+
+def test_openai_extractor_reads_pdf_text_validates_and_repairs():
+    from underwriter.extract.llm import DocInput, OpenAIExtractor
+    from pypdf import PdfWriter
+    import io
+    w = PdfWriter(); w.add_blank_page(100, 100); buf = io.BytesIO(); w.write(buf)
+    good = json.dumps({"legal_name": "Acme", "naics_suggestions": [{"code": "722511"}]})
+    client = FakeOpenAI(["{not json", good])
+    ex = OpenAIExtractor(client=client, model="gpt-5.6-terra")
+    out = ex.extract([DocInput("a.pdf", buf.getvalue())], "sys", "do it", BusinessProfile, "t")
+    assert out.legal_name == "Acme"
+    assert len(client.requests) == 2                      # one repair retry
+    assert client.requests[0]["model"] == "gpt-5.6-terra"
+    assert ex.usage.calls == 2
+
+
+def test_key_name_picks_the_service(monkeypatch):
+    from underwriter.extract import llm
+    for n in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", *llm.OPENAI_KEY_NAMES):
+        monkeypatch.delenv(n, raising=False)
+    assert llm.provider() is None
+    monkeypatch.setenv("API_INVESTD", " fAtVAtt7xxxx ")
+    assert llm.provider() == "openai" and llm.openai_key() == "fAtVAtt7xxxx"
+    monkeypatch.setenv("API_INVESTD", "sk-ant-api-xxxx")
+    assert llm.provider() == "anthropic" and llm.anthropic_key() == "sk-ant-api-xxxx"
