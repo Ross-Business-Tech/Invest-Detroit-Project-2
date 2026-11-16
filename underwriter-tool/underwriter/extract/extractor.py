@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from ..schema import BusinessProfile, CREData, Deal, DealTerms, DocumentRecord, FinancialStatements
 from . import prompts
-from .llm import ClaudeExtractor, DocInput
+from .llm import DocInput, make_extractor
 from .pdf_utils import inspect_pdf
 
 FS_TYPES = {"financial_statements", "tax_return", "interim_financials", "projections"}
@@ -51,7 +51,7 @@ def run_extraction(files: list[tuple[str, bytes]], deal_id: str, client=None,
         docs.append(DocInput(name, data))
         records.append(DocumentRecord(name=name, doc_type="unclassified", pages=info.pages, text_layer=info.has_text_layer))
         log.append(f"{name}: {info.pages} pages, {'text layer' if info.has_text_layer else 'image-only (scanned)'}")
-    ex = ClaudeExtractor(client=client)
+    ex = make_extractor(client)
     progress("Classifying documents")
     cls = ex.extract(docs, prompts.SYSTEM, prompts.CLASSIFY, Classification, "classify", max_tokens=8000)
     for c in cls.documents:
