@@ -6,7 +6,7 @@ from ..guidelines import load_guidelines
 from ..schema import REVENUE_KEYS, VACANCY_KEYS
 from .blocks import bullets, kv, n, numbered, p, pc, placeholder, row, section, subhead, table, x
 from .common_sections import (benchmarking_section, compliance_section, documents_section, header, qual,
-                              term_sheet_section)
+                              risk_rating_section, term_sheet_section)
 
 REV_ORDER = ["gross_retail_rent", "retail_vacancy", "gross_office_rent", "office_vacancy", "gross_residential_rent",
              "residential_vacancy", "other_gross_rent", "other_vacancy", "cam_reimbursement", "other_income", "general_vacancy"]
@@ -358,6 +358,6 @@ def build_cre_memo(deal, r, policy, naics, bench, risk) -> dict:
     secs.append(term_sheet_section(deal, r, policy))
     secs.append(section("exhibit_c", "Exhibit C - Development Budget", [budget_exhibit(r)]))
     if risk:
-        secs.append(section("risk_rating", "Appendix A - Risk Rating", risk_table(risk)))
+        secs.append(risk_rating_section(deal, risk))
     secs.append(documents_section(policy))
     return {"title": "Investment Summary", "deal_type": "cre", "sections": secs}

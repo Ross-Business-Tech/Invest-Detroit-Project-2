@@ -152,6 +152,70 @@ def term_sheet_section(deal, analysis: dict, policy: dict) -> dict:
                    p("Draft terms are generated from the request and the Loan Product Matrix; the loan officer sets final pricing and structure.", "computed")])
 
 
+def risk_rating_section(deal, risk: dict) -> dict:
+    """Invest Detroit Risk Rating worksheet + the matrix Interpretation (used by both the CRE and SB memos)."""
+    rows = [row([x_["category"], "" if x_["score"] is None else f"{x_['score']:g}", x_["comment"] or ""],
+                "" if x_["score"] is not None else "flag") for x_ in risk["rows"]]
+    rows.append(row(["Total", f"{risk['total']:g}" if risk["total"] is not None else "", ""], "total"))
+    rows.append(row(["Preliminary Risk Rating", f"{risk['preliminary']}" if risk["preliminary"] is not None else "",
+                     "round(average of category scores)"], "bold"))
+    if risk.get("override"):
+        rows.append(row(["Management Override", f"{risk['override']:g}", risk.get("override_comment") or ""], "bold"))
+    blocks = [table(risk.get("worksheet", "Risk Rating Worksheet"), ["Category", "Score", "Comments / Rationale"], rows, kind="grid",
+                    footnote="Quantitative categories are scored automatically from the analysis using anchors from Invest Detroit's "
+                             "sample worksheet (full rubric not yet confirmed); other categories are underwriter inputs. Scores run 1 "
+                             "(Outstanding) to 8 (Loss).")]
+    interp = risk.get("interpretation")
+    if interp:
+        blocks.append(subhead("Interpretation"))
+        blocks.append(p(f"A risk rating of {interp['rating']} is “{interp['label']}” on Invest Detroit's Risk Rating Matrix "
+                        f"(rev. 2/27/2024): {interp['meaning']} Associated allowance for loan losses (ALL): {fmt_pct(interp['all_pct'], 1)}.",
+                        "computed"))
+    if not risk.get("complete"):
+        blocks.append(p("Some categories still need an underwriter score before the rating is final.", "computed"))
+    return section("risk_rating", "Risk Rating", blocks)
+
+
+_IMPACT = {"critical": "High", "warning": "Medium", "info": "Low"}
+
+
+def key_risks_section(flags: list, policy: dict | None = None) -> dict:
+    """Key Risks and Mitigants, in Invest Detroit's template format (Risk / Probability / Impact / Mitigants),
+    pre-filled from the computed review flags and policy exceptions so the underwriter confirms rather than starts blank."""
+    # mitigants already reasoned out for policy exceptions, keyed by the item text
+    exc_mit = {}
+    if policy:
+        for e in policy.get("exceptions", []):
+            if e.get("mitigants"):
+                exc_mit[e["item"].lower()] = e["mitigants"]
+    order = {"critical": 0, "warning": 1, "info": 2}
+    picked, seen = [], set()
+    for f in sorted(flags, key=lambda f: order.get(f.severity, 3)):
+        if f.severity == "info" or f.message in seen:
+            continue
+        seen.add(f.message)
+        picked.append(f)
+    blocks = []
+    if not picked:
+        blocks.append(p("No material risks were flagged automatically. The underwriter should still document the key risks for this deal.", "computed"))
+    for f in picked:
+        blocks.append(subhead(f"Risk: {f.message}"))
+        prob = "High" if f.severity == "critical" else "Medium"
+        blocks.append(p(f"Probability of Occurrence: {prob} [underwriter to confirm]", "computed"))
+        blocks.append(p(f"Impact on Loan Repayment: {_IMPACT.get(f.severity, 'Medium')} [underwriter to confirm]", "computed"))
+        mit = None
+        for item, ms in exc_mit.items():
+            if item in f.message.lower():
+                mit = ms
+                break
+        if mit:
+            blocks.append(p("Mitigants:"))
+            blocks.append(bullets(mit, "computed"))
+        else:
+            blocks.append(placeholder(f"mitigant for: {f.message}"))
+    return section("key_risks", "Key Risks and Mitigants", blocks)
+
+
 def flags_section(flags: list) -> dict:
     order = {"critical": 0, "warning": 1, "info": 2}
     fl = sorted(flags, key=lambda f: order.get(f.severity, 3))

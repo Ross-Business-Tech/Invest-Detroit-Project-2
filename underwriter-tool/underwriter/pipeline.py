@@ -5,7 +5,7 @@ from .engine.common import Flag, jsonable
 from .engine.cre import analyze_cre
 from .engine.policy import check_policy, risk_rating
 from .engine.small_business import analyze_small_business
-from .memo.common_sections import flags_section
+from .memo.common_sections import flags_section, key_risks_section
 from .memo.cre_memo import build_cre_memo
 from .memo.small_business_memo import build_small_business_memo
 from .naics import benchmarks as nb
@@ -20,8 +20,8 @@ def analyze(deal: Deal) -> dict:
         r["id_as_equity"] = deal.terms.options.treat_id_note_as_equity
         bench = nb.compare_small_business(r, naics["code"])
         policy = check_policy(deal, r, naics["code"])
-        risk = None
-        memo = build_small_business_memo(deal, r, policy, naics, bench)
+        risk = risk_rating(deal, r, policy)
+        memo = build_small_business_memo(deal, r, policy, naics, bench, risk)
     else:
         if deal.cre is None:
             raise ValueError("CRE deal has no CRE data (projections, rent roll, budget).")
@@ -40,6 +40,7 @@ def analyze(deal: Deal) -> dict:
         flags.append(Flag("warning", "missing", "Required before deal screen but not received: " + "; ".join(miss) + "."))
     if deal.extraction_mode == "fixture":
         flags.append(Flag("info", "data_quality", "Extraction loaded from a hand-verified fixture (not live LLM extraction)."))
+    memo["sections"].append(key_risks_section(flags, policy))
     memo["sections"].append(flags_section(flags))
     summary = _summary(deal, r, policy, naics, risk)
     return {"deal_id": deal.id, "deal_type": deal.terms.deal_type, "summary": summary, "memo": memo,

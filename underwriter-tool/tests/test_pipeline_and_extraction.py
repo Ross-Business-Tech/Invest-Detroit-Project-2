@@ -167,3 +167,27 @@ def test_key_name_picks_the_service(monkeypatch):
     assert llm.provider() == "openai" and llm.openai_key() == "fAtVAtt7xxxx"
     monkeypatch.setenv("API_INVESTD", "sk-ant-api-xxxx")
     assert llm.provider() == "anthropic" and llm.anthropic_key() == "sk-ant-api-xxxx"
+
+
+def _section(memo, title):
+    return next((s for s in memo["sections"] if s["title"] == title), None)
+
+
+def test_risk_rating_and_key_risks_match_id_templates(sb_deal, cre_deal):
+    from underwriter.engine.policy import interpret_rating
+    assert interpret_rating(1)["label"] == "Outstanding"
+    assert interpret_rating(5)["label"] == "Special Mention"
+    assert interpret_rating(8)["label"] == "Loss"
+    for deal, worksheet in ((sb_deal, "Small Business Worksheet"), (cre_deal, "Commercial Real Estate Worksheet")):
+        out = analyze(deal)
+        memo = out["memo"]
+        rr = _section(memo, "Risk Rating")
+        assert rr is not None, "every ID Investment Summary has a Risk Rating section"
+        tbl = next(b for b in rr["blocks"] if b["type"] == "table")
+        assert tbl["title"] == worksheet
+        assert any(b["type"] == "subhead" and b["text"] == "Interpretation" for b in rr["blocks"])
+        kr = _section(memo, "Key Risks and Mitigants")
+        assert kr is not None
+        # ID format: each risk carries Probability of Occurrence and Impact on Loan Repayment
+        texts = " ".join(b.get("text", "") for b in kr["blocks"])
+        assert "Probability of Occurrence" in texts and "Impact on Loan Repayment" in texts
