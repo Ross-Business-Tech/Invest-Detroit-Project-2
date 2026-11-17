@@ -6,7 +6,7 @@ from datetime import date
 from ..engine.common import fmt_m, fmt_money, fmt_pct, fmt_x, safe_div
 from .blocks import bullets, n, p, pc, placeholder, row, section, subhead, table, x
 from .common_sections import (benchmarking_section, compliance_section, documents_section, flags_section, header,
-                              qual, term_sheet_section)
+                              qual, risk_rating_section, term_sheet_section)
 
 
 def _plabel(s, pid) -> str:
@@ -455,7 +455,7 @@ def strengths_weaknesses(deal, r, policy, bench) -> tuple[list, list]:
     return W, S
 
 
-def build_small_business_memo(deal, r, policy, naics, bench) -> dict:
+def build_small_business_memo(deal, r, policy, naics, bench, risk=None) -> dict:
     s, inc = r["spread"], r["income"]
     hist = r["hist"]
     secs = []
@@ -506,6 +506,8 @@ def build_small_business_memo(deal, r, policy, naics, bench) -> dict:
     W, S = strengths_weaknesses(deal, r, policy, bench)
     secs.append(section("weaknesses", "Weaknesses", [bullets(W)] if W else [p("None identified.")]))
     secs.append(section("strengths", "Strengths", [bullets(S)] if S else [placeholder("strengths")]))
+    if risk:
+        secs.append(risk_rating_section(deal, risk))
     secs.append(compliance_section(policy))
     secs.append(term_sheet_section(deal, r, policy))
     # exhibits

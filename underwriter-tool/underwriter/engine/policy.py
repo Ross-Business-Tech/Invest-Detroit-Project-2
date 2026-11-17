@@ -22,6 +22,39 @@ RISK_CATEGORIES = [
     ("industry_market", "Industry / Market / Economy"),
 ]
 
+# Small Business worksheet categories (Invest Detroit "SB RR Worksheet").
+SB_RISK_CATEGORIES = [
+    ("management_team", "Management / Team"),
+    ("operating_history", "Operating History"),
+    ("cash_flow_debt_service", "Cash Flow / Debt Service"),
+    ("payment_history", "Payment History"),
+    ("balance_sheet", "Balance Sheet"),
+    ("collateral_support", "Collateral & Support"),
+    ("industry_market", "Industry / Market"),
+]
+
+# Invest Detroit Risk Rating Matrix (updated 2/27/2024): rating -> plain-language meaning the templates call
+# "Interpretation", with the typical DSC/LTV profile and the Allowance for Loan Losses (ALL) percentage.
+RISK_INTERPRETATION = {
+    1: ("Outstanding", "Typically 100% cash secured; DSC > 1.50x and LTV < 65%.", 0.0),
+    2: ("Excellent", "Demonstrated ability to refinance; DSC > 1.30x and LTV < 80%.", 0.0),
+    3: ("Strong", "Clear ability to service debt from the primary source, reasonable track record; DSC > 1.20x and LTV < 85%.", 0.01),
+    4: ("Acceptable", "Acceptable risk without a proven track record or with lower collateral value; DSC > 1.15x and LTV < 90%.", 0.02),
+    5: ("Special Mention", "Weaknesses that, if not corrected, may inadequately protect ID's position; DSC near 1.0x and LTV < 100%.", 0.10),
+    6: ("Substandard (Non-Accrual / Impaired)", "High probability of payment default or other well-defined weaknesses; full collection in doubt.", 0.25),
+    7: ("Doubtful", "High probability of substantial loss, deferred only for specific pending events.", 0.75),
+    8: ("Loss", "Little prospect of collecting principal or interest; recorded as a loss.", 1.0),
+}
+
+
+def interpret_rating(n: Optional[float]) -> Optional[dict]:
+    """Map a 1-8 risk rating to Invest Detroit's matrix interpretation (nearest whole rating)."""
+    if n is None:
+        return None
+    r = min(8, max(1, int(round(n))))
+    label, meaning, all_pct = RISK_INTERPRETATION[r]
+    return {"rating": r, "label": label, "meaning": meaning, "all_pct": all_pct}
+
 
 def _exc(kind, item, requirement, actual, counts=True, mitigants=None, source="Appendix B"):
     return {"kind": kind, "item": item, "requirement": requirement, "actual": actual,
@@ -245,43 +278,69 @@ def document_checklist(deal: Deal) -> dict:
             "missing_required_before_screen": [x["item"] for x in screen if x["status"] == "missing" and x["requirement"] == "required"]}
 
 
-def risk_rating(deal: Deal, analysis: dict, policy: dict) -> Optional[dict]:
-    """CRE risk-rating worksheet. Quantitative categories are scored from the analysis using the only anchors
-    known from the sample (UNVERIFIED rubric); qualitative categories come from underwriter input."""
-    if deal.terms.deal_type != "cre":
-        return None
-    rs = deal.terms.risk_scores
-    rows = []
+def _cre_auto_score(key, analysis, deal):
+    """Auto-scores for the quantitative CRE categories, using the only anchors known from ID's sample worksheet."""
     coll = analysis.get("collateral", {})
     ltv = coll.get("ltv_gross")
-    senior_ltv = ltv  # ID is senior lender
     si = analysis.get("stabilized_index")
     dscr = analysis["dscr_proposed"][si] if si is not None else None
     su = analysis.get("sources_uses", {})
-    G = load_guidelines()
-    rt = deal.cre.property.rehab_type
-    req_hc = G["contingencies"]["new_construction" if rt == "new_construction" else "rehab_construction"]["hard"]
-    for key, label in RISK_CATEGORIES:
-        auto, comment = None, None
-        if key == "project_financial" and ltv is not None:
-            auto = 1 if (ltv < 0.65 and senior_ltv < 0.55) else 2 if ltv < 0.75 else 3 if ltv < 0.85 else 4 if ltv <= 1.0 else 5
-            comment = f"Construction: LTV {fmt_pct(ltv)} (< 65% for a 1); Senior Debt LTV {fmt_pct(senior_ltv)} (< 55% for a 1)."
-        elif key == "debt_service" and dscr is not None:
-            auto = 1 if dscr > 1.45 else 2 if dscr >= 1.30 else 3 if dscr >= 1.20 else 4 if dscr >= 1.15 else 5
-            comment = f"Mortgage: stabilized DSCR {fmt_x(dscr)} on the Invest Detroit loan (Total > 1.40x and Senior > 1.45x for a 1)."
-        elif key == "hard_cost_contingency" and su.get("hard_contingency_pct") is not None:
-            ok = su["hard_contingency_pct"] + 1e-9 >= req_hc
-            auto = 2 if ok else 4
-            comment = (f"Hard cost contingency {fmt_pct(su['hard_contingency_pct'])} vs {fmt_pct(req_hc, 0)} required; "
-                       "reserve for adaptive reuse projects less than 15% or new construction less than 10% scores a 4.")
+    if key == "project_financial" and ltv is not None:
+        senior_ltv = ltv  # ID is senior lender
+        auto = 1 if (ltv < 0.65 and senior_ltv < 0.55) else 2 if ltv < 0.75 else 3 if ltv < 0.85 else 4 if ltv <= 1.0 else 5
+        return auto, f"Construction: LTV {fmt_pct(ltv)} (< 65% for a 1); Senior Debt LTV {fmt_pct(senior_ltv)} (< 55% for a 1)."
+    if key == "debt_service" and dscr is not None:
+        auto = 1 if dscr > 1.45 else 2 if dscr >= 1.30 else 3 if dscr >= 1.20 else 4 if dscr >= 1.15 else 5
+        return auto, f"Mortgage: stabilized DSCR {fmt_x(dscr)} on the Invest Detroit loan (Total > 1.40x and Senior > 1.45x for a 1)."
+    if key == "hard_cost_contingency" and su.get("hard_contingency_pct") is not None:
+        G = load_guidelines()
+        rt = deal.cre.property.rehab_type
+        req_hc = G["contingencies"]["new_construction" if rt == "new_construction" else "rehab_construction"]["hard"]
+        ok = su["hard_contingency_pct"] + 1e-9 >= req_hc
+        return (2 if ok else 4), (f"Hard cost contingency {fmt_pct(su['hard_contingency_pct'])} vs {fmt_pct(req_hc, 0)} required; "
+                                  "reserve for adaptive reuse projects less than 15% or new construction less than 10% scores a 4.")
+    return None, None
+
+
+def _sb_auto_score(key, analysis, deal):
+    """The one Small Business category we can score from the numbers: Cash Flow / Debt Service, from the DSCR
+    of the most recent historical period."""
+    if key == "cash_flow_debt_service":
+        ratios = analysis.get("ratios") or {}
+        dscr = None
+        for pid in reversed(list(ratios.keys())):
+            v = ratios[pid].get("dscr")
+            if v is not None:
+                dscr = v
+                break
+        if dscr is not None:
+            auto = 1 if dscr > 1.50 else 2 if dscr >= 1.30 else 3 if dscr >= 1.20 else 4 if dscr >= 1.15 else 5
+            return auto, f"Most recent historical DSC of {fmt_x(dscr)} (> 1.50x for a 1, > 1.20x for a 3, > 1.15x for a 4)."
+    return None, None
+
+
+def risk_rating(deal: Deal, analysis: dict, policy: dict) -> Optional[dict]:
+    """Risk-rating worksheet (Invest Detroit CRE or Small Business). Quantitative categories are scored from the
+    analysis using the anchors known from ID's sample worksheets (UNVERIFIED rubric); qualitative categories come
+    from underwriter input. The result also carries the matrix Interpretation of the preliminary/final rating."""
+    is_cre = deal.terms.deal_type == "cre"
+    categories = RISK_CATEGORIES if is_cre else SB_RISK_CATEGORIES
+    auto_fn = _cre_auto_score if is_cre else _sb_auto_score
+    rs = deal.terms.risk_scores
+    rows = []
+    for key, label in categories:
+        auto, comment = auto_fn(key, analysis, deal)
         given = rs.get(key)
         score = given.score if (given and given.score is not None) else auto
         rows.append({"key": key, "category": label, "score": score, "auto_score": auto,
-                     "comment": (given.comment if given and given.comment else comment), "source": "input" if given and given.score is not None else ("computed" if auto else "missing")})
+                     "comment": (given.comment if given and given.comment else comment),
+                     "source": "input" if given and given.score is not None else ("computed" if auto else "missing")})
     scores = [r["score"] for r in rows if r["score"] is not None]
     total = sum(scores) if scores else None
     prelim = int(total / len(scores) + 0.5) if scores else None
     ov = rs.get("management_override")
+    final = (ov.score if ov and ov.score else prelim)
     return {"rows": rows, "total": total, "preliminary": prelim, "override": ov.score if ov else None,
-            "override_comment": ov.comment if ov else None, "final": (ov.score if ov and ov.score else prelim),
-            "complete": len(scores) == len(RISK_CATEGORIES), "rubric_verified": False}
+            "override_comment": ov.comment if ov else None, "final": final,
+            "worksheet": "Commercial Real Estate Worksheet" if is_cre else "Small Business Worksheet",
+            "interpretation": interpret_rating(final), "complete": len(scores) == len(categories), "rubric_verified": False}
